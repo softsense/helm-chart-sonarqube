@@ -1,0 +1,79 @@
+{{- if .Values.networkPolicy.enabled }}
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ template "sonarqube.fullname" . }}-network-policy
+  labels:
+    app: {{ template "sonarqube.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ template "sonarqube.name" . }}
+      release: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            app: {{ template "sonarqube.name" . }}
+      ports:
+      - protocol: TCP
+        port: {{ .Values.service.internalPort }}
+      - protocol: TCP
+        port: 9001
+        endPort: 9003
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          networking/namespace: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+      - protocol: TCP
+        port: 53
+      - protocol: UDP
+        port: 53
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ template "sonarqube.name" . }}
+    ports:
+      - protocol: TCP
+        port: {{ .Values.service.internalPort }}
+      - protocol: TCP
+        port: 9001
+        endPort: 9003
+{{- if .Values.postgresql.enabled }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: {{ template "sonarqube.name" . }}
+    port:
+      - protocol: TCP
+        port: 5432
+{{ end -}}
+{{- end -}}
+
+{{- if and .Values.networkPolicy.enabled .Values.networkPolicy.additionalNetworkPolicys -}}
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ template "sonarqube.fullname" . }}-network-policy
+  labels:
+    app: {{ template "sonarqube.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+{{- with .Values.networkPolicy.additionalNetworkPolicys -}}
+{{ toYaml . | indent 4 }}
+{{- end }}
+{{- end -}}
